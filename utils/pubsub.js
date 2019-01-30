@@ -20,7 +20,7 @@ class ExtendedPubSub extends PubSub {
     return this.createTopic(name);
   }
 
-  async createSubscriptionIfNotExists(topicOrName, name) {
+  async createSubscriptionIfNotExists(topicOrName, name, options = {}) {
     const topic = await (() => {
       if (_.isString(topicOrName)) {
         return this.createOrGetTopic(topicOrName);
@@ -39,7 +39,7 @@ class ExtendedPubSub extends PubSub {
       return Promise.resolve();
     }
 
-    return topic.createSubscription(name);
+    return topic.createSubscription(name, options);
   }
 
   async createOrGetTopic(name) {
@@ -48,8 +48,8 @@ class ExtendedPubSub extends PubSub {
     return this.topic(name);
   }
 
-  async createOrGetSubscription(topicOrName, name) {
-    await this.createSubscriptionIfNotExists(topicOrName, name);
+  async createOrGetSubscription(topicOrName, name, options = {}) {
+    await this.createSubscriptionIfNotExists(topicOrName, name, options);
 
     const topic = await (() => {
       if (_.isString(topicOrName)) {
