@@ -1,0 +1,64 @@
+{
+  "name": "worker",
+  "version": "0.0.1",
+  "description": "The job worker/publisher base on google/pubsub. It might be crawler job worker or export data worker, mail sender...etc.",
+  "main": "index.js",
+  "scripts": {
+    "test": "./node_modules/.bin/jest \\.test\\.js$",
+    "lint": "./node_modules/.bin/eslint .",
+    "start": "node index"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:CapsLock-Studio/job-worker.git"
+  },
+  "author": "Calvin Huang",
+  "license": "MIT",
+  "homepage": "https://github.com/CapsLock-Studio/job-worker",
+  "devDependencies": {
+    "@babel/core": "^7.2.0",
+    "@babel/preset-env": "^7.2.0",
+    "eslint": "^5.3.0",
+    "eslint-config-airbnb": "17.1.0",
+    "eslint-import-resolver-alias": "^1.1.1",
+    "eslint-plugin-import": "^2.14.0",
+    "eslint-plugin-jsx-a11y": "^6.1.1",
+    "eslint-plugin-react": "^7.11.0",
+    "jest": "^23.6.0",
+    "nodemon": "^1.18.7",
+    "proxyquire": "^2.1.0",
+    "sinon": "^7.2.2",
+    "through2": "^3.0.0"
+  },
+  "dependencies": {
+    "@google-cloud/pubsub": "^0.22.2",
+    "@sendgrid/mail": "^6.3.1",
+    "axios": "^0.18.0",
+    "dotenv": "^6.1.0",
+    "koa": "^2.6.2",
+    "koa-bodyparser": "^4.2.1",
+    "koa-router": "^7.4.0",
+    "koa2-swagger-ui": "^2.11.10",
+    "lodash": "^4.17.11",
+    "module-alias": "^2.1.0",
+    "moment": "^2.22.2",
+    "moment-timezone": "^0.5.23",
+    "randomatic": "^3.1.1",
+    "rollbar": "^2.5.1",
+    "winston": "^3.1.0"
+  },
+  "_moduleAliases": {
+    "~config": "./config",
+    "~utils": "./utils"
+  },
+  "jest": {
+    "moduleNameMapper": {
+      "^~config(.*)$": "<rootDir>/config$1",
+      "^~utils(.*)$": "<rootDir>/utils$1"
+    },
+    "testEnvironment": "node"
+  },
+  "nodemonConfig": {
+    "delay": "2500"
+  }
+}
