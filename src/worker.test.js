@@ -115,4 +115,62 @@ describe('queue/Worker', () => {
       });
     });
   });
+
+  describe('.shutdown', () => {
+    const sandbox = sinon.createSandbox();
+
+    // Mock request
+    const request = {
+      subscription: {},
+      streamAckDeadlineSeconds: 10,
+    };
+
+    let worker;
+    beforeEach(() => {
+      const pubsub = proxyquire(
+        '~utils/pubsub',
+        {
+          '@google-cloud/pubsub': googlePubsub,
+        },
+      );
+
+      sandbox
+        // eslint-disable-next-line
+        .stub(client._innerApiCalls, 'streamingPull')
+        .value(mockBidiStreamingGrpcMethod(request, { receivedMessages: [] }));
+
+      sandbox
+        .stub(pubsub, 'getClient_')
+        .value((_, callback) => {
+          // Mock Grpc layer
+          callback(null, client);
+        });
+
+      sandbox.stub(pubsub, 'getTopics').returns([[{ name: 'test-1' }, { name: 'test-2' }]]);
+      sandbox
+        .stub(googlePubsub.Topic.prototype, 'getSubscriptions')
+        .returns([[{ name: `test-1-${subscriptionName}` }, { name: `test-1-${subscriptionName}` }]]);
+      sandbox
+        .stub(pubsub, 'request').value((config, callback) => {
+          callback(null, {});
+        });
+
+      worker = new Worker({}, pubsub);
+    });
+
+    afterEach(() => {
+      sandbox.restore();
+    });
+
+    test('should remove all subscriptions after shuting down', async () => {
+      await worker.process('test-1', () => { });
+      await worker.process('test-2', () => { });
+
+      expect(Object.values(worker.subscriptions).length).toBe(2);
+
+      worker.shutdown();
+
+      expect(Object.values(worker.subscriptions).length).toBe(0);
+    });
+  });
 });

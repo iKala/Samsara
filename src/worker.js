@@ -60,22 +60,12 @@ class Worker extends EventEmitter {
     });
   }
 
-  async shutdown() {
+  shutdown() {
     const subscriptions = Object.values(this.subscriptions);
 
-    // Wait for all subscriotion lisnter removed.
-    await new Promise((resolve) => {
-      let stoppedSubscriptionsCount = 0;
-      subscriptions.forEach((subscription) => {
-        subscription.removeListener('message', (message) => {
-          logger.log('Shutting down the subscription of worker', { subscription, message });
-          stoppedSubscriptionsCount += 1;
-
-          if (stoppedSubscriptionsCount === subscriptions.length) {
-            resolve();
-          }
-        });
-      });
+    subscriptions.forEach((subscription) => {
+      logger.log('Shutting down the subscription of worker', { subscription });
+      subscription.removeListener('message', () => { });
     });
 
     // Flush all subscription caches.
