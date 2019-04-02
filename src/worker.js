@@ -59,6 +59,28 @@ class Worker extends EventEmitter {
       this.emit('error', error);
     });
   }
+
+  async shutdown() {
+    const subscriptions = Object.values(this.subscriptions);
+
+    // Wait for all subscriotion lisnter removed.
+    await new Promise((resolve) => {
+      let stoppedSubscriptionsCount = 0;
+      subscriptions.forEach((subscription) => {
+        subscription.removeListener('message', (message) => {
+          logger.log('Shutting down the subscription of worker', { subscription, message });
+          stoppedSubscriptionsCount += 1;
+
+          if (stoppedSubscriptionsCount === subscriptions.length) {
+            resolve();
+          }
+        });
+      });
+    });
+
+    // Flush all subscription caches.
+    this.subscriptions = {};
+  }
 }
 
 const worker = new Worker();
