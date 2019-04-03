@@ -1,20 +1,28 @@
 {
-  "name": "worker",
-  "version": "0.0.1",
+  "name": "samsara-queue",
+  "version": "0.0.1-alpha",
   "description": "The job worker/publisher base on google/pubsub. It might be crawler job worker or export data worker, mail sender...etc.",
-  "main": "index.js",
+  "main": "src/index.js",
   "scripts": {
     "test": "./node_modules/.bin/jest \\.test\\.js$",
-    "lint": "./node_modules/.bin/eslint .",
-    "start": "node index"
+    "lint": "./node_modules/.bin/eslint ."
   },
   "repository": {
     "type": "git",
-    "url": "git@github.com:CapsLock-Studio/job-worker.git"
+    "url": "git@github.com:iKala/Samsara.git"
   },
   "author": "Calvin Huang",
   "license": "MIT",
-  "homepage": "https://github.com/CapsLock-Studio/job-worker",
+  "homepage": "https://github.com/iKala/Samsara",
+  "keywords": [
+    "job",
+    "queue",
+    "worker",
+    "google pubsub",
+    "Cloud Pub/Sub",
+    "Pub/Sub",
+    "pub/sub"
+  ],
   "devDependencies": {
     "@babel/core": "^7.2.0",
     "@babel/preset-env": "^7.2.0",
