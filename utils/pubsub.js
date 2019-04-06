@@ -4,11 +4,6 @@
 const { PubSub, Topic } = require('@google-cloud/pubsub');
 const _ = require('lodash');
 
-/**
- * Configurations
- */
-const { credentials } = require('~config/pubsub');
-
 class ExtendedPubSub extends PubSub {
   async createTopicIfNotExists(name) {
     const [topics] = await this.getTopics();
@@ -67,6 +62,4 @@ class ExtendedPubSub extends PubSub {
   }
 }
 
-const pubsub = new ExtendedPubSub({ credentials });
-
-module.exports = pubsub;
+module.exports = ExtendedPubSub;
