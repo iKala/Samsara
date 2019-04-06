@@ -6,23 +6,29 @@ const moment = require('moment');
 /**
  * Utilities
  */
-const logger = require('~utils/logger');
-const pubsub = require('~utils/pubsub');
+const PubSub = require('~utils/pubsub');
 
 /**
  * Configurations
  */
-const { topicSuffix } = require('~config/pubsub');
 
 class Job {
-  constructor({ name, data = {} }, pubsubClient = pubsub) {
+  constructor({ name, data = {} }, config = {}) {
     this.name = name;
     this.data = data;
+    this.config = config;
 
-    this.pubsub = pubsubClient;
+    const { credentials } = config;
+
+    if (!credentials) {
+      throw new Error('`credentials` is required for setting up the Google Cloud Pub/Sub');
+    }
+
+    this.pubsub = new PubSub({ credentials });
   }
 
   async save() {
+    const { topicSuffix } = this.config;
     const topicName = `${this.name}-${topicSuffix}`;
     const topic = await this.pubsub.createOrGetTopic(topicName);
 
@@ -33,12 +39,10 @@ class Job {
       }),
     );
 
-    logger.error(`The job created on the ${topicName}`, { data: this.data, dataBuffer });
+    console.log(`The job created on the ${topicName}`, { data: this.data, dataBuffer });
 
     return topic.publisher().publish(dataBuffer, this.data);
   }
 }
 
-const createJob = (name, data) => new Job({ name, data });
-
-module.exports = { default: createJob, Job };
+module.exports = { default: Job, Job };

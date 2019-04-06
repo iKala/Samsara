@@ -1,3 +1,5 @@
+require('module-alias/register');
+
 /**
  * Module dependencies
  */
@@ -26,12 +28,14 @@ describe('queue/Job', () => {
     let job;
 
     beforeEach(() => {
-      const pubsub = proxyquire(
+      const PubSub = proxyquire(
         '~utils/pubsub',
         {
           '@google-cloud/pubsub': googlePubsub,
         },
       );
+
+      const pubsub = new PubSub();
 
       publisher = new Publisher(topicName);
 
@@ -42,7 +46,8 @@ describe('queue/Job', () => {
           callback(null, {});
         });
 
-      job = new Job({ name: testJobName, data: jobData }, pubsub);
+      job = new Job({ name: testJobName, data: jobData }, { credentials: {} });
+      job.pubsub = pubsub;
     });
 
     afterEach(() => {
