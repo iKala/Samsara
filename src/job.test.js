@@ -11,7 +11,7 @@ const { Publisher } = require('@google-cloud/pubsub/build/src/publisher');
  */
 const { topicSuffix } = require('../config/pubsub');
 
-const { Job } = require('./job');
+const Job = require('./job');
 
 describe('queue/Job', () => {
   jest.setTimeout(2000);

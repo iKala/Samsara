@@ -78,4 +78,4 @@ class Worker extends EventEmitter {
   }
 }
 
-module.exports = { default: Worker, Worker };
+module.exports = Worker;

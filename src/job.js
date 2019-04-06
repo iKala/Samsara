@@ -45,4 +45,4 @@ class Job {
   }
 }
 
-module.exports = { default: Job, Job };
+module.exports = Job;

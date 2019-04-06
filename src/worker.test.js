@@ -13,7 +13,7 @@ const moment = require('moment');
  */
 const { topicSuffix, subscriptionName } = require('../config/pubsub');
 
-const { Worker } = require('./worker');
+const Worker = require('./worker');
 
 const mockBidiStreamingGrpcMethod = (expectedRequest, response, error) => () => {
   const mockStream = through2.obj((chunk, enc, callback) => {
