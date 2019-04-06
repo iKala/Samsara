@@ -1,5 +1,3 @@
-require('module-alias/register');
-
 const Job = require('./job');
 const Worker = require('./worker');
 

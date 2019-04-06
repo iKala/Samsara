@@ -6,7 +6,7 @@ const moment = require('moment');
 /**
  * Utilities
  */
-const PubSub = require('~utils/pubsub');
+const PubSub = require('../utils/pubsub');
 
 /**
  * Configurations

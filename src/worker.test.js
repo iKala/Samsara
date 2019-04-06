@@ -1,5 +1,3 @@
-require('module-alias/register');
-
 /**
  * Module dependencies
  */
@@ -13,7 +11,7 @@ const moment = require('moment');
 /**
  * Configurations
  */
-const { topicSuffix, subscriptionName } = require('~config/pubsub');
+const { topicSuffix, subscriptionName } = require('../config/pubsub');
 
 const { Worker } = require('./worker');
 
@@ -69,7 +67,7 @@ describe('queue/Worker', () => {
 
     beforeEach(() => {
       const PubSub = proxyquire(
-        '~utils/pubsub',
+        '../utils/pubsub',
         {
           '@google-cloud/pubsub': googlePubsub,
         },
@@ -133,7 +131,7 @@ describe('queue/Worker', () => {
     let worker;
     beforeEach(() => {
       const PubSub = proxyquire(
-        '~utils/pubsub',
+        '../utils/pubsub',
         {
           '@google-cloud/pubsub': googlePubsub,
         },

@@ -1,5 +1,3 @@
-require('module-alias/register');
-
 /**
  * Module dependencies
  */
@@ -11,7 +9,7 @@ const { Publisher } = require('@google-cloud/pubsub/build/src/publisher');
 /**
  * Configurations
  */
-const { topicSuffix } = require('~config/pubsub');
+const { topicSuffix } = require('../config/pubsub');
 
 const { Job } = require('./job');
 
@@ -29,7 +27,7 @@ describe('queue/Job', () => {
 
     beforeEach(() => {
       const PubSub = proxyquire(
-        '~utils/pubsub',
+        '../utils/pubsub',
         {
           '@google-cloud/pubsub': googlePubsub,
         },

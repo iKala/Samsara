@@ -1,5 +1,3 @@
-require('module-alias/register');
-
 /**
  * Module dependencies
  */
@@ -8,7 +6,7 @@ const { Topic, Subscription } = require('@google-cloud/pubsub');
 /**
  * Configurations
  */
-const { credentials, topicSuffix, subscriptionName } = require('~config/pubsub');
+const { credentials, topicSuffix, subscriptionName } = require('../config/pubsub');
 const PubSub = require('./pubsub');
 
 const pubsub = new PubSub({ credentials });

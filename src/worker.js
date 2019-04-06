@@ -7,7 +7,7 @@ const moment = require('moment');
 /**
  * Utilities
  */
-const PubSub = require('~utils/pubsub');
+const PubSub = require('../utils/pubsub');
 
 class Worker extends EventEmitter {
   constructor(config = {}) {

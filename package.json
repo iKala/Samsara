@@ -48,22 +48,13 @@
     "koa-router": "^7.4.0",
     "koa2-swagger-ui": "^2.11.10",
     "lodash": "^4.17.11",
-    "module-alias": "^2.1.0",
     "moment": "^2.22.2",
     "moment-timezone": "^0.5.23",
     "randomatic": "^3.1.1",
     "rollbar": "^2.5.1",
     "winston": "^3.1.0"
   },
-  "_moduleAliases": {
-    "~config": "./config",
-    "~utils": "./utils"
-  },
   "jest": {
-    "moduleNameMapper": {
-      "^~config(.*)$": "<rootDir>/config$1",
-      "^~utils(.*)$": "<rootDir>/utils$1"
-    },
     "testEnvironment": "node"
   },
   "nodemonConfig": {
