@@ -1,9 +1,9 @@
-const { default: createJob, Job } = require('./job');
-const { default: worker, Worker } = require('./worker');
+require('module-alias/register');
 
-module.exports = {
-  createJob,
-  Job,
-  worker,
-  Worker,
-};
+const Job = require('./job');
+const Worker = require('./worker');
+
+module.exports = (config) => ({
+  createJob: (name, data) => new Job({ name, data }, config),
+  createWorker: () => new Worker(config),
+});
