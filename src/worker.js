@@ -7,29 +7,32 @@ const moment = require('moment');
 /**
  * Utilities
  */
-const logger = require('~utils/logger');
-const pubsub = require('~utils/pubsub');
-
-/**
- * Configurations
- */
-const { topicSuffix, subscriptionName } = require('~config/pubsub');
+const PubSub = require('~utils/pubsub');
 
 class Worker extends EventEmitter {
-  constructor(config = {}, pubsubClient = pubsub) {
+  constructor(config = {}) {
     super();
 
+    const { credentials } = config;
+
+    if (!credentials) {
+      throw new Error('`credentials` is required for setting up the Google Cloud Pub/Sub');
+    }
+
     this.config = config;
-    this.pubsub = pubsubClient;
+    this.pubsub = new PubSub({ credentials });
+
     this.subscriptions = {};
   }
 
-  async getSubscription(topicName) {
+  async getSubscription(topicName, options) {
+    const { subscriptionName } = this.config;
+
     // Establish the new subscription when it is not exists
     if (!this.subscriptions[topicName]) {
       // Combine topic name with subscription name to allow a worker building multi subscriptions.
       this.subscriptions[topicName] = await this.pubsub
-        .createOrGetSubscription(topicName, `${topicName}-${subscriptionName}`, this.config);
+        .createOrGetSubscription(topicName, `${topicName}-${subscriptionName}`, options);
     }
 
     return this.subscriptions[topicName];
@@ -39,14 +42,16 @@ class Worker extends EventEmitter {
     jobName,
     // eslint-disable-next-line no-unused-vars
     callback = (jobData = {}, done = () => { }) => { },
+    options,
   ) {
+    const { topicSuffix } = this.config;
     // Create a job queue name(topic) with topic suffix for preventing naming conflic.
     const topicName = `${jobName}-${topicSuffix}`;
-    const subscription = await this.getSubscription(topicName);
+    const subscription = await this.getSubscription(topicName, options);
 
     subscription.on('message', (message) => {
       const doneCallback = () => {
-        logger.log(`The job of ${topicName} is finished and submit the ack request`, { message });
+        console.log(`The job of ${topicName} is finished and submit the ack request`, { message });
 
         // Since the message ack not support promise for now (google/pubsub repo WIP).
         // We have no way to know the exactly time when the ack job done.
@@ -55,7 +60,7 @@ class Worker extends EventEmitter {
       callback(message.attributes, doneCallback);
     });
     subscription.on('error', (error) => {
-      logger.error(`The job of ${topicName} failed at ${moment().utc()}`, error);
+      console.log(`The job of ${topicName} failed at ${moment().utc()}`, error);
       this.emit('error', error);
     });
   }
@@ -64,7 +69,7 @@ class Worker extends EventEmitter {
     const subscriptions = Object.values(this.subscriptions);
 
     subscriptions.forEach((subscription) => {
-      logger.log('Shutting down the subscription of worker', { subscription });
+      console.log('Shutting down the subscription of worker', { subscription });
       subscription.removeListener('message', () => { });
     });
 
@@ -73,6 +78,4 @@ class Worker extends EventEmitter {
   }
 }
 
-const worker = new Worker();
-
-module.exports = { default: worker, Worker };
+module.exports = { default: Worker, Worker };

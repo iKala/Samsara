@@ -1,3 +1,5 @@
+require('module-alias/register');
+
 /**
  * Module dependencies
  */
@@ -66,12 +68,14 @@ describe('queue/Worker', () => {
     let worker;
 
     beforeEach(() => {
-      const pubsub = proxyquire(
+      const PubSub = proxyquire(
         '~utils/pubsub',
         {
           '@google-cloud/pubsub': googlePubsub,
         },
       );
+
+      const pubsub = new PubSub();
 
       sandbox
         // eslint-disable-next-line
@@ -93,7 +97,8 @@ describe('queue/Worker', () => {
           callback(null, {});
         });
 
-      worker = new Worker({}, pubsub);
+      worker = new Worker({ credentials: {} });
+      worker.pubsub = pubsub;
     });
 
     afterEach(() => {
@@ -127,12 +132,14 @@ describe('queue/Worker', () => {
 
     let worker;
     beforeEach(() => {
-      const pubsub = proxyquire(
+      const PubSub = proxyquire(
         '~utils/pubsub',
         {
           '@google-cloud/pubsub': googlePubsub,
         },
       );
+
+      const pubsub = new PubSub();
 
       sandbox
         // eslint-disable-next-line
@@ -155,7 +162,8 @@ describe('queue/Worker', () => {
           callback(null, {});
         });
 
-      worker = new Worker({}, pubsub);
+      worker = new Worker({ credentials: {} });
+      worker.pubsub = pubsub;
     });
 
     afterEach(() => {
