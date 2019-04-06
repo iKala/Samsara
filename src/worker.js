@@ -57,7 +57,7 @@ class Worker extends EventEmitter {
         // We have no way to know the exactly time when the ack job done.
         message.ack();
       };
-      callback(message.attributes, doneCallback);
+      callback({ ...message.attributes, jobId: message.id }, doneCallback);
     });
     subscription.on('error', (error) => {
       console.log(`The job of ${topicName} failed at ${moment().utc()}`, error);
