@@ -13,14 +13,14 @@ class Worker extends EventEmitter {
   constructor(config = {}) {
     super();
 
-    const { credentials } = config;
+    const { credentials, projectId } = config;
 
     if (!credentials) {
       throw new Error('`credentials` is required for setting up the Google Cloud Pub/Sub');
     }
 
     this.config = config;
-    this.pubsub = new PubSub({ credentials });
+    this.pubsub = new PubSub({ credentials, projectId });
 
     this.subscriptions = {};
   }

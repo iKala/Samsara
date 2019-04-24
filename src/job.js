@@ -18,13 +18,13 @@ class Job {
     this.data = data;
     this.config = config;
 
-    const { credentials } = config;
+    const { credentials, projectId } = config;
 
     if (!credentials) {
       throw new Error('`credentials` is required for setting up the Google Cloud Pub/Sub');
     }
 
-    this.pubsub = new PubSub({ credentials });
+    this.pubsub = new PubSub({ credentials, projectId });
   }
 
   async save() {
