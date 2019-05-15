@@ -28,7 +28,7 @@ class Job {
   }
 
   async save() {
-    const { topicSuffix } = this.config;
+    const { topicSuffix, batching = {} } = this.config;
     const topicName = `${this.name}-${topicSuffix}`;
     const topic = await this.pubsub.createOrGetTopic(topicName);
 
@@ -41,7 +41,7 @@ class Job {
 
     console.log(`The job created on the ${topicName}`, { data: this.data, dataBuffer });
 
-    return topic.publisher().publish(dataBuffer, this.data);
+    return topic.publisher(batching).publish(dataBuffer, this.data);
   }
 }
 
