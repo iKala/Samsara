@@ -58,7 +58,7 @@ class ExtendedPubSub extends PubSub {
       throw new Error('topicOrName must be string or topic instance.');
     })();
 
-    return topic.subscription(name);
+    return topic.subscription(name, options);
   }
 }
 
