@@ -41,7 +41,7 @@ class Worker extends EventEmitter {
   async process(
     jobName,
     // eslint-disable-next-line no-unused-vars
-    callback = (jobData = {}, done = () => { }) => { },
+    callback = (jobData = {}, done = () => { }, failed = () => { }) => { },
     options,
   ) {
     const { topicSuffix } = this.config;
@@ -57,7 +57,14 @@ class Worker extends EventEmitter {
         // We have no way to know the exactly time when the ack job done.
         message.ack();
       };
-      callback({ ...message.attributes, jobId: message.id }, doneCallback);
+      const failedCallback = () => {
+        console.log(`The job of ${topicName} failed and submit the nack request, retry the message again`, { message });
+
+        // Same to the comment of `doneCallback`.
+        // There is no way to know when will the nack job done.
+        message.nack();
+      };
+      callback({ ...message.attributes, jobId: message.id }, doneCallback, failedCallback);
     });
     subscription.on('error', (error) => {
       console.log(`The job of ${topicName} failed at ${moment().utc()}`, error);
