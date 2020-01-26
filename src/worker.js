@@ -66,7 +66,7 @@ class Worker extends EventEmitter {
         // There is no way to know when will the nack job done.
         message.nack();
       };
-      callback({ ...data, jobId: message.id }, doneCallback, failedCallback);
+      callback({ ...message.attributes, ...data, jobId: message.id }, doneCallback, failedCallback);
     });
     subscription.on('error', (error) => {
       console.log(`The job of ${topicName} failed at ${moment().utc()}`, error);
