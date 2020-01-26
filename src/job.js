@@ -34,6 +34,7 @@ class Job {
 
     const dataBuffer = Buffer.from(
       JSON.stringify({
+        ...this.data,
         topicName,
         createdAt: moment().utc(),
       }),
@@ -41,7 +42,7 @@ class Job {
 
     console.log(`The job created on the ${topicName}`, { data: this.data, dataBuffer });
 
-    return topic.publisher(batching).publish(dataBuffer, this.data);
+    return topic.publisher(batching).publish(dataBuffer);
   }
 }
 
