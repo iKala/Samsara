@@ -50,6 +50,8 @@ class Worker extends EventEmitter {
     const subscription = await this.getSubscription(topicName, options);
 
     subscription.on('message', (message) => {
+      const data = JSON.parse(message.data.toString());
+
       const doneCallback = () => {
         console.log(`The job of ${topicName} is finished and submit the ack request`, { message });
 
@@ -64,7 +66,7 @@ class Worker extends EventEmitter {
         // There is no way to know when will the nack job done.
         message.nack();
       };
-      callback({ ...message.attributes, jobId: message.id }, doneCallback, failedCallback);
+      callback({ ...data, jobId: message.id }, doneCallback, failedCallback);
     });
     subscription.on('error', (error) => {
       console.log(`The job of ${topicName} failed at ${moment().utc()}`, error);
