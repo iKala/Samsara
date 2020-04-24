@@ -2,6 +2,7 @@
  * Module dependencies
  */
 const { PubSub, Topic } = require('@google-cloud/pubsub');
+
 const _ = require('lodash');
 
 class ExtendedPubSub extends PubSub {
@@ -37,10 +38,10 @@ class ExtendedPubSub extends PubSub {
     return topic.createSubscription(name, options);
   }
 
-  async createOrGetTopic(name) {
+  async createOrGetTopic(name, options) {
     await this.createTopicIfNotExists(name);
 
-    return this.topic(name);
+    return this.topic(name, options);
   }
 
   async createOrGetSubscription(topicOrName, name, options = {}) {
