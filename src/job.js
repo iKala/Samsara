@@ -7,6 +7,7 @@ const moment = require('moment');
  * Utilities
  */
 const PubSub = require('../utils/pubsub');
+const Logger = require('../utils/logger');
 
 /**
  * Configurations
@@ -25,6 +26,7 @@ class Job {
     }
 
     this.pubsub = new PubSub({ credentials, projectId });
+    this.logger = new Logger({ debug: config.debug });
   }
 
   async save() {
@@ -40,7 +42,7 @@ class Job {
       }),
     );
 
-    console.log(`The job created on the ${topicName}`, { data: this.data, dataBuffer });
+    this.logger.log(`The job created on the ${topicName}`, { data: this.data, dataBuffer });
 
     return topic.publish(dataBuffer);
   }

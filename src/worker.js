@@ -8,6 +8,7 @@ const moment = require('moment');
  * Utilities
  */
 const PubSub = require('../utils/pubsub');
+const Logger = require('../utils/logger');
 
 class Worker extends EventEmitter {
   constructor(config = {}) {
@@ -21,6 +22,7 @@ class Worker extends EventEmitter {
 
     this.config = config;
     this.pubsub = new PubSub({ credentials, projectId });
+    this.logger = new Logger({ debug: config.debug });
 
     this.subscriptions = {};
   }
@@ -53,14 +55,14 @@ class Worker extends EventEmitter {
       const data = JSON.parse(message.data.toString());
 
       const doneCallback = () => {
-        console.log(`The job of ${topicName} is finished and submit the ack request`, { message });
+        this.logger.log(`The job of ${topicName} is finished and submit the ack request`, { message });
 
         // Since the message ack not support promise for now (google/pubsub repo WIP).
         // We have no way to know the exactly time when the ack job done.
         message.ack();
       };
       const failedCallback = () => {
-        console.log(`The job of ${topicName} failed and submit the nack request, retry the message again`, { message });
+        this.logger.log(`The job of ${topicName} failed and submit the nack request, retry the message again`, { message });
 
         // Same to the comment of `doneCallback`.
         // There is no way to know when will the nack job done.
@@ -69,7 +71,7 @@ class Worker extends EventEmitter {
       callback({ ...message.attributes, ...data, jobId: message.id }, doneCallback, failedCallback);
     });
     subscription.on('error', (error) => {
-      console.log(`The job of ${topicName} failed at ${moment().utc()}`, error);
+      this.logger.log(`The job of ${topicName} failed at ${moment().utc()}`, error);
       this.emit('error', error);
     });
   }
@@ -78,7 +80,7 @@ class Worker extends EventEmitter {
     const subscriptions = Object.values(this.subscriptions);
 
     subscriptions.forEach((subscription) => {
-      console.log('Shutting down the subscription of worker', { subscription });
+      this.logger.log('Shutting down the subscription of worker', { subscription });
       subscription.removeListener('message', () => { });
     });
 
