@@ -1,14 +1,19 @@
+/* eslint-disable no-await-in-loop */
+/* eslint-disable no-underscore-dangle */
 /**
  * Module dependencies
  */
+const _  = require('lodash');
 const { EventEmitter } = require('events');
 const moment = require('moment');
+const { v1 } = require('@google-cloud/pubsub');
 
 /**
  * Utilities
  */
-const PubSub = require('../utils/pubsub');
 const Logger = require('../utils/logger');
+
+const defaultMaxRetries = 200;
 
 class Worker extends EventEmitter {
   constructor(config = {}) {
@@ -20,24 +25,12 @@ class Worker extends EventEmitter {
       throw new Error('`credentials` is required for setting up the Google Cloud Pub/Sub');
     }
 
-    this.config = config;
-    this.pubsub = new PubSub({ credentials, projectId });
-    this.logger = new Logger({ debug: config.debug });
+    const configWithDefaultValue = _.defaults(config, { maxRetries: defaultMaxRetries });
 
-    this.subscriptions = {};
-  }
+    this.config = configWithDefaultValue;
+    this.logger = new Logger({ debug: configWithDefaultValue.debug });
 
-  async getSubscription(topicName, options) {
-    const { subscriptionName } = this.config;
-
-    // Establish the new subscription when it is not exists
-    if (!this.subscriptions[topicName]) {
-      // Combine topic name with subscription name to allow a worker building multi subscriptions.
-      this.subscriptions[topicName] = await this.pubsub
-        .createOrGetSubscription(topicName, `${topicName}-${subscriptionName}`, options);
-    }
-
-    return this.subscriptions[topicName];
+    this.subscriber = new v1.SubscriberClient({ credentials, projectId });
   }
 
   async process(
@@ -49,30 +42,107 @@ class Worker extends EventEmitter {
     const { topicSuffix } = this.config;
     // Create a job queue name(topic) with topic suffix for preventing naming conflic.
     const topicName = `${jobName}-${topicSuffix}`;
-    const subscription = await this.getSubscription(topicName, options);
 
-    subscription.on('message', (message) => {
-      const data = JSON.parse(message.data.toString());
+    let inProgress = 0;
+    const maxInProgress = Number(options.flowControl.maxMessages);
 
-      const doneCallback = () => {
-        this.logger.log(`The job of ${topicName} is finished and submit the ack request`, { message });
+    const formattedSubscription = this.subscriber.subscriptionPath(
+      this.config.projectId,
+      `${topicName}-${this.config.subscriptionName}`,
+    );
 
-        // Since the message ack not support promise for now (google/pubsub repo WIP).
-        // We have no way to know the exactly time when the ack job done.
-        message.ack();
-      };
-      const failedCallback = () => {
-        this.logger.log(`The job of ${topicName} failed and submit the nack request, retry the message again`, { message });
+    // The maximum number of messages returned for this request.
+    // Pub/Sub may return fewer than the number specified.
+    const request = {
+      subscription: formattedSubscription,
+      maxMessages: 1,
+    };
 
-        // Same to the comment of `doneCallback`.
-        // There is no way to know when will the nack job done.
-        message.nack();
-      };
-      callback({ ...message.attributes, ...data, jobId: message.id }, doneCallback, failedCallback);
-    });
-    subscription.on('error', (error) => {
-      this.logger.log(`The job of ${topicName} failed at ${moment().utc()}`, error);
-      this.emit('error', error);
+    setInterval(async () => {
+      if (inProgress < maxInProgress) {
+        try {
+          inProgress += 1;
+
+          // The subscriber pulls a specified number of messages.
+          const [response] = await this.subscriber.pull(request);
+          // Process the messages.
+          response.receivedMessages.forEach(({ ackId, message }) => {
+            const data = JSON.parse(message.data.toString());
+
+            const ackRequest = {
+              subscription: formattedSubscription,
+              ackIds: [ackId],
+            };
+
+            const doneCallback = async () => {
+              this.logger.log(`The job of ${topicName} is finished and submit the ack request`, { message });
+
+              let latestError;
+              let retry = -1;
+              const maxRetries = this.config.maxRetries || defaultMaxRetries;
+
+              do {
+                try {
+                  await this.subscriber.acknowledge(ackRequest);
+                  inProgress = inProgress > 0 ? inProgress - 1 : 0;
+
+                  return;
+                } catch (error) {
+                  latestError = error;
+                  retry += 1;
+                  this.logger.log(`🔄 Retry to ack message ${retry}/${maxRetries}`);
+                }
+
+                if (retry > maxRetries) {
+                  retry = -1;
+                  this.logger.log('❌ Retry too much time.');
+                }
+              } while (retry !== -1);
+
+              throw latestError;
+            };
+
+            const failedCallback = async () => {
+              this.logger.log(`The job of ${topicName} failed and submit the nack request, retry the message again`, { message });
+
+              // Same to the comment of `doneCallback`.
+              // There is no way to know when will the nack job done.
+              let latestError;
+              let retry = -1;
+              const maxRetries = this.config.maxRetries || defaultMaxRetries;
+
+              do {
+                try {
+                  await this.subscriber.acknowledge(ackRequest);
+                  inProgress = inProgress > 0 ? inProgress - 1 : 0;
+
+                  return;
+                } catch (error) {
+                  latestError = error;
+                  retry += 1;
+                  this.logger.log(`🔄 Retry to nack message ${retry}/${maxRetries}`);
+                }
+
+                if (retry > maxRetries) {
+                  retry = -1;
+                  this.logger.log('❌ Retry too much time.');
+                }
+              } while (retry !== -1);
+
+              throw latestError;
+            };
+
+            callback(
+              { ...message.attributes, ...data, jobId: message.id },
+              doneCallback,
+              failedCallback,
+            );
+          });
+        } catch (error) {
+          // Failed to pull message.
+          inProgress -= 1;
+        }
+      }
     });
   }
 
