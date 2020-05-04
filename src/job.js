@@ -1,6 +1,8 @@
+/* eslint-disable no-await-in-loop */
 /**
  * Module dependencies
  */
+const _ = require('lodash');
 const moment = require('moment');
 
 /**
@@ -13,20 +15,25 @@ const Logger = require('../utils/logger');
  * Configurations
  */
 
+const defaultMaxRetries = 200;
+
 class Job {
   constructor({ name, data = {} }, config = {}) {
     this.name = name;
     this.data = data;
-    this.config = config;
 
-    const { credentials, projectId } = config;
+    const configWithDefaultValue = _.defaults(config, { maxRetries: defaultMaxRetries });
+
+    this.config = configWithDefaultValue;
+
+    const { credentials, projectId } = configWithDefaultValue;
 
     if (!credentials) {
       throw new Error('`credentials` is required for setting up the Google Cloud Pub/Sub');
     }
 
     this.pubsub = new PubSub({ credentials, projectId });
-    this.logger = new Logger({ debug: config.debug });
+    this.logger = new Logger({ debug: configWithDefaultValue.debug });
   }
 
   async save() {
@@ -42,9 +49,28 @@ class Job {
       }),
     );
 
-    this.logger.log(`The job created on the ${topicName}`, { data: this.data, dataBuffer });
+    let latestError;
+    let retry = -1;
+    const maxRetries = this.config.maxRetries || defaultMaxRetries;
 
-    return topic.publish(dataBuffer);
+    do {
+      try {
+        const message = await topic.publish(dataBuffer);
+        this.logger.log(`The job created on the ${topicName}`, { data: this.data, dataBuffer });
+        return message;
+      } catch (error) {
+        latestError = error;
+        retry += 1;
+        this.logger.log(`🔄 Retry ${retry}/${maxRetries}`);
+      }
+
+      if (retry > maxRetries) {
+        retry = -1;
+        this.logger.log('❌ Retry too much time.');
+      }
+    } while (retry !== -1);
+
+    throw latestError;
   }
 }
 
