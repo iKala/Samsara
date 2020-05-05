@@ -4,6 +4,7 @@
  */
 const _ = require('lodash');
 const moment = require('moment');
+const grpc = require('grpc');
 
 /**
  * Utilities
@@ -32,7 +33,7 @@ class Job {
       throw new Error('`credentials` is required for setting up the Google Cloud Pub/Sub');
     }
 
-    this.pubsub = new PubSub({ credentials, projectId });
+    this.pubsub = new PubSub({ credentials, projectId, grpc });
     this.logger = new Logger({ debug: configWithDefaultValue.debug });
   }
 

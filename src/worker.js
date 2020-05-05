@@ -5,8 +5,8 @@
  */
 const _  = require('lodash');
 const { EventEmitter } = require('events');
-const moment = require('moment');
 const { v1 } = require('@google-cloud/pubsub');
+const grpc = require('grpc');
 
 /**
  * Utilities
@@ -30,7 +30,7 @@ class Worker extends EventEmitter {
     this.config = configWithDefaultValue;
     this.logger = new Logger({ debug: configWithDefaultValue.debug });
 
-    this.subscriber = new v1.SubscriberClient({ credentials, projectId });
+    this.subscriber = new v1.SubscriberClient({ credentials, projectId, grpc });
   }
 
   async process(
