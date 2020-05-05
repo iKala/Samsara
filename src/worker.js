@@ -69,8 +69,15 @@ class Worker extends EventEmitter {
           response.receivedMessages.forEach(({ ackId, message }) => {
             const data = JSON.parse(message.data.toString());
 
+            let isDoneOrFailed = false;
 
             const doneCallback = async () => {
+              if (isDoneOrFailed) {
+                return;
+              }
+
+              isDoneOrFailed = true;
+
               this.logger.log(`The job of ${topicName} is finished and submit the ack request`, { message });
 
               let latestError;
@@ -104,6 +111,12 @@ class Worker extends EventEmitter {
             };
 
             const failedCallback = async () => {
+              if (isDoneOrFailed) {
+                return;
+              }
+
+              isDoneOrFailed = true;
+
               this.logger.log(`The job of ${topicName} failed and submit the nack request, retry the message again`, { message });
 
               // Same to the comment of `doneCallback`.
