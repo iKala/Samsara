@@ -156,7 +156,7 @@ class Worker extends EventEmitter {
             };
 
             callback(
-              { ...message.attributes, ...data, jobId: message.id },
+              { ...message.attributes, ...data, jobId: message.messageId },
               doneCallback,
               failedCallback,
             );
