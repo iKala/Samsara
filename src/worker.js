@@ -69,10 +69,6 @@ class Worker extends EventEmitter {
           response.receivedMessages.forEach(({ ackId, message }) => {
             const data = JSON.parse(message.data.toString());
 
-            const ackRequest = {
-              subscription: formattedSubscription,
-              ackIds: [ackId],
-            };
 
             const doneCallback = async () => {
               this.logger.log(`The job of ${topicName} is finished and submit the ack request`, { message });
@@ -83,6 +79,11 @@ class Worker extends EventEmitter {
 
               do {
                 try {
+                  const ackRequest = {
+                    subscription: formattedSubscription,
+                    ackIds: [ackId],
+                  };
+
                   await this.subscriber.acknowledge(ackRequest);
                   inProgress = inProgress > 0 ? inProgress - 1 : 0;
 
@@ -113,7 +114,16 @@ class Worker extends EventEmitter {
 
               do {
                 try {
-                  await this.subscriber.acknowledge(ackRequest);
+                  const modifyAckRequest = {
+                    subscription: formattedSubscription,
+                    ackIds: [ackId],
+                    // If this parameter is 0, a default value of 10 seconds is used.
+                    ackDeadlineSeconds: 10,
+                  };
+
+                  // If the message is not yet processed, reset its ack deadline.
+                  await this.subscriber.modifyAckDeadline(modifyAckRequest);
+
                   inProgress = inProgress > 0 ? inProgress - 1 : 0;
 
                   return;
