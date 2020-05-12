@@ -1,6 +1,6 @@
 {
   "name": "samsara-queue",
-  "version": "0.0.1-beta.12",
+  "version": "0.0.1-beta.13",
   "description": "The job worker/publisher base on google/pubsub. It might be crawler job worker or export data worker, mail sender...etc.",
   "main": "src/index.js",
   "scripts": {
