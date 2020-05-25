@@ -4,26 +4,24 @@
  */
 const _ = require('lodash');
 const moment = require('moment');
+const { v1 } = require('@google-cloud/pubsub');
 const grpc = require('grpc');
 
 /**
  * Utilities
  */
-const PubSub = require('../utils/pubsub');
 const Logger = require('../utils/logger');
 
 /**
  * Configurations
  */
 
-const defaultMaxRetries = 200;
-
 class Job {
   constructor({ name, data = {} }, config = {}) {
     this.name = name;
     this.data = data;
 
-    const configWithDefaultValue = _.defaults(config, { maxRetries: defaultMaxRetries });
+    const configWithDefaultValue = _.defaults(config);
 
     this.config = configWithDefaultValue;
 
@@ -33,14 +31,19 @@ class Job {
       throw new Error('`credentials` is required for setting up the Google Cloud Pub/Sub');
     }
 
-    this.pubsub = new PubSub({ credentials, projectId, grpc });
     this.logger = new Logger({ debug: configWithDefaultValue.debug });
+
+    this.publisher = new v1.PublisherClient({ credentials, projectId, grpc });
   }
 
   async save() {
-    const { topicSuffix, batching = {} } = this.config;
+    const { projectId, topicSuffix, batching = {} } = this.config;
     const topicName = `${this.name}-${topicSuffix}`;
-    const topic = await this.pubsub.createOrGetTopic(topicName, { batching });
+
+    const formattedTopic = this.publisher.topicPath(
+      projectId,
+      topicName,
+    );
 
     const dataBuffer = Buffer.from(
       JSON.stringify({
@@ -50,28 +53,42 @@ class Job {
       }),
     );
 
-    let latestError;
-    let retry = -1;
-    const maxRetries = this.config.maxRetries || defaultMaxRetries;
+    const messagesElement = {
+      data: dataBuffer,
+    };
+    const messages = [messagesElement];
 
-    do {
-      try {
-        const message = await topic.publish(dataBuffer);
-        this.logger.log(`The job created on the ${topicName}`, { data: this.data, dataBuffer });
-        return message;
-      } catch (error) {
-        latestError = error;
-        retry += 1;
-        this.logger.log(`🔄 Retry ${retry}/${maxRetries}`);
-      }
+    // Build the request
+    const request = {
+      topic: formattedTopic,
+      messages: messages,
+    };
 
-      if (retry > maxRetries) {
-        retry = -1;
-        this.logger.log('❌ Retry too much time.');
-      }
-    } while (retry !== -1);
+    const retrySettings = {
+      retryCodes: [
+        10, // 'ABORTED'
+        1, // 'CANCELLED',
+        4, // 'DEADLINE_EXCEEDED'
+        13, // 'INTERNAL'
+        8, // 'RESOURCE_EXHAUSTED'
+        14, // 'UNAVAILABLE'
+        2, // 'UNKNOWN'
+      ],
+      backoffSettings: {
+        initialRetryDelayMillis: 100,
+        retryDelayMultiplier: 1.3,
+        maxRetryDelayMillis: 60000,
+        initialRpcTimeoutMillis: 5000,
+        rpcTimeoutMultiplier: 1.0,
+        maxRpcTimeoutMillis: 600000,
+        totalTimeoutMillis: 600000,
+      },
+    };
 
-    throw latestError;
+    return await this.publisher.publish(request, {
+      retry: retrySettings,
+      batching,
+    });
   }
 }
 
