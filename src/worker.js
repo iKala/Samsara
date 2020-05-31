@@ -131,7 +131,7 @@ class Worker extends EventEmitter {
                     subscription: formattedSubscription,
                     ackIds: [ackId],
                     // If this parameter is 0, a default value of 10 seconds is used.
-                    ackDeadlineSeconds: 10,
+                    ackDeadlineSeconds: 600,
                   };
 
                   // If the message is not yet processed, reset its ack deadline.
