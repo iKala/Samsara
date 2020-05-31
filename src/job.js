@@ -16,62 +16,46 @@ const Logger = require('../utils/logger');
  * Configurations
  */
 
-const defaultMaxRetries = 200;
+const cachedPubsubClient = {};
+const cachedTopic = {};
 
 class Job {
   constructor({ name, data = {} }, config = {}) {
     this.name = name;
     this.data = data;
+    this.config = config;
 
-    const configWithDefaultValue = _.defaults(config, { maxRetries: defaultMaxRetries });
-
-    this.config = configWithDefaultValue;
-
-    const { credentials, projectId } = configWithDefaultValue;
+    const { credentials, projectId, topicSuffix, batching = {} } = config;
 
     if (!credentials) {
       throw new Error('`credentials` is required for setting up the Google Cloud Pub/Sub');
     }
 
-    this.pubsub = new PubSub({ credentials, projectId, grpc });
-    this.logger = new Logger({ debug: configWithDefaultValue.debug });
+    if (!cachedPubsubClient[projectId]) {
+      cachedPubsubClient[projectId] = new PubSub({ credentials, projectId, grpc });
+    }
+
+    this.topicName = `${this.name}-${topicSuffix}`;
+    this.pubsub = cachedPubsubClient[projectId];
+
+    if (!cachedTopic[`${projectId}-${this.topicName}`]) {
+      cachedTopic[`${projectId}-${this.topicName}`] = this.pubsub.topic(this.topicName, { batching });
+    }
+
+    this.topic = cachedTopic[`${projectId}-${this.topicName}`];
+    this.logger = new Logger({ debug: config.debug });
   }
 
   async save() {
-    const { topicSuffix, batching = {} } = this.config;
-    const topicName = `${this.name}-${topicSuffix}`;
-    const topic = await this.pubsub.createOrGetTopic(topicName, { batching });
-
     const dataBuffer = Buffer.from(
       JSON.stringify({
         ...this.data,
-        topicName,
+        topicName: this.topicName,
         createdAt: moment().utc(),
       }),
     );
 
-    let latestError;
-    let retry = -1;
-    const maxRetries = this.config.maxRetries || defaultMaxRetries;
-
-    do {
-      try {
-        const message = await topic.publish(dataBuffer);
-        this.logger.log(`The job created on the ${topicName}`, { data: this.data, dataBuffer });
-        return message;
-      } catch (error) {
-        latestError = error;
-        retry += 1;
-        this.logger.log(`🔄 Retry ${retry}/${maxRetries}`);
-      }
-
-      if (retry > maxRetries) {
-        retry = -1;
-        this.logger.log('❌ Retry too much time.');
-      }
-    } while (retry !== -1);
-
-    throw latestError;
+    return this.topic.publish(dataBuffer);
   }
 }
 
