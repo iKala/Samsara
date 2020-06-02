@@ -58,7 +58,7 @@ class Worker extends EventEmitter {
       maxMessages: 1,
     };
 
-    setInterval(async () => {
+    const timer = setInterval(async () => {
       if (inProgress < maxInProgress) {
         try {
           inProgress += 1;
@@ -166,6 +166,10 @@ class Worker extends EventEmitter {
           inProgress -= 1;
         }
       }
+    });
+
+    process.on('SIGTERM', () => {
+      clearInterval(timer);
     });
   }
 
