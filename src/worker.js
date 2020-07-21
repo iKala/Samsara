@@ -65,6 +65,12 @@ class Worker extends EventEmitter {
 
           // The subscriber pulls a specified number of messages.
           const [response] = await this.subscriber.pull(request);
+
+          if (response.receivedMessages.length === 0) {
+            inProgress -= 1;
+            return; 
+          }
+
           // Process the messages.
           response.receivedMessages.forEach(({ ackId, message }) => {
             const data = JSON.parse(message.data.toString());
