@@ -33,6 +33,133 @@ class Worker extends EventEmitter {
     this.subscriber = new v1.SubscriberClient({ credentials, projectId, grpc });
   }
 
+  async bulk(
+    jobName,
+    callback = (jobDatas = [], done = () => { }, failed = () => { }) => { },
+    bulkSize = 50,
+  ) {
+    const { topicSuffix } = this.config;
+    // Create a job queue name(topic) with topic suffix for preventing naming conflic.
+    const topicName = `${jobName}-${topicSuffix}`;
+
+    const formattedSubscription = this.subscriber.subscriptionPath(
+      this.config.projectId,
+      `${topicName}-${this.config.subscriptionName}`,
+    );
+
+
+    // The maximum number of messages returned for this request.
+    // Pub/Sub may return fewer than the number specified.
+    const request = {
+      subscription: formattedSubscription,
+      maxMessages: bulkSize,
+    };
+
+    do {
+      let isDoneOrFailed = false;
+
+      // The subscriber pulls a specified number of messages.
+      const [response] = await this.subscriber.pull(request);
+
+      const data = response.receivedMessages.map(({ message }) => ({
+        ...message.attributes,
+        ...JSON.parse(message.data.toString()),
+        jobId: message.messageId,
+      }));
+      const ackIds = response.receivedMessages.map(({ ackId }) => ackId);
+      const jobIds = data.map(({ jobId }) => jobId);
+
+      this.logger.log(`The job of ${topicName} is finished and submit the ack request`, jobIds);
+
+      const doneCallback = async () => {
+        if (isDoneOrFailed) {
+          return;
+        }
+
+        this.logger.log(`[bulk] The job of ${topicName} is finished and submit the ack request`, jobIds);
+
+        let latestError;
+        let retry = -1;
+        const maxRetries = this.config.maxRetries || defaultMaxRetries;
+
+        do {
+          try {
+            const ackRequest = {
+              subscription: formattedSubscription,
+              ackIds,
+            };
+
+            await this.subscriber.acknowledge(ackRequest);
+            inProgress = inProgress > 0 ? inProgress - 1 : 0;
+
+            return;
+          } catch (error) {
+            latestError = error;
+            retry += 1;
+            this.logger.log(`🔄 Retry to ack message ${retry}/${maxRetries}`);
+          }
+
+          if (retry > maxRetries) {
+            retry = -1;
+            this.logger.log('❌ Retry too much time.');
+          }
+        } while (retry !== -1);
+
+        throw latestError;
+      };
+
+      const failedCallback = async () => {
+        if (isDoneOrFailed) {
+          return;
+        }
+
+        isDoneOrFailed = true;
+
+        this.logger.log(`[bulk] The job of ${topicName} failed and submit the nack request, retry the message again`, jobIds);
+
+        // Same to the comment of `doneCallback`.
+        // There is no way to know when will the nack job done.
+        let latestError;
+        let retry = -1;
+        const maxRetries = this.config.maxRetries || defaultMaxRetries;
+
+        do {
+          try {
+            const modifyAckRequest = {
+              subscription: formattedSubscription,
+              ackIds,
+              // If this parameter is 0, a default value of 10 seconds is used.
+              ackDeadlineSeconds: 0,
+            };
+
+            // If the message is not yet processed, reset its ack deadline.
+            await this.subscriber.modifyAckDeadline(modifyAckRequest);
+
+            return;
+          } catch (error) {
+            latestError = error;
+            retry += 1;
+            this.logger.log(`🔄 Retry to nack message ${retry}/${maxRetries}`);
+          }
+
+          if (retry > maxRetries) {
+            retry = -1;
+            this.logger.log('❌ Retry too much time.');
+          }
+        } while (retry !== -1);
+
+        throw latestError;
+      };
+
+      // Process the messages.
+      await callback(
+        data,
+        doneCallback,
+        failedCallback,
+      );
+    } while (true);
+  }
+
   async process(
     jobName,
     // eslint-disable-next-line no-unused-vars
