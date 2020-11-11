@@ -2,46 +2,54 @@
  * Module dependencies
  */
 const { PubSub, Topic } = require('@google-cloud/pubsub');
-
 const _ = require('lodash');
 
 class ExtendedPubSub extends PubSub {
-  async createTopicIfNotExists(name) {
+
+  // Get topic by name
+  async getTopicMatchName(topicName) {
     const [topics] = await this.getTopics();
 
-    if (topics.find(topic => topic.name.endsWith(name))) {
-      return Promise.resolve();
+    const foundTopic = topics.find(topic => topic.name.endsWith(topicName));
+    // console.log(foundTopic);
+    if (foundTopic) {
+      return foundTopic;
     }
-
-    return this.createTopic(name);
+    return null;
   }
 
-  async createSubscriptionIfNotExists(topicOrName, name, options = {}) {
+  async createSubscriptionIfNotExists(topicName, name, options = {}) {
     const topic = await (() => {
-      if (_.isString(topicOrName)) {
-        return this.createOrGetTopic(topicOrName);
+      if (_.isString(topicName)) {
+        return this.createOrGetTopic(topicName);
       }
 
-      if (topicOrName instanceof Topic) {
-        return topicOrName;
-      }
-
-      throw new Error('topicOrName must be string or topic instance.');
+      throw new Error('topicName must be string.');
     })();
-
     const [subscriptions] = await topic.getSubscriptions();
 
     if (subscriptions.find(subscription => subscription.name.endsWith(name))) {
       return Promise.resolve();
     }
 
-    return topic.createSubscription(name, options);
+    return this.createSubscription(topicName, name, options);
   }
 
-  async createOrGetTopic(name, options) {
-    await this.createTopicIfNotExists(name);
-
-    return this.topic(name, options);
+  /**
+   * Get topic or create.
+   * @param {string} name The name of the topic
+   * @returns {Topic} 
+   */
+  async createOrGetTopic(name) {
+    const topic = await this.getTopicMatchName(name);
+    if (!topic) {
+      const createdTopic = await this.createTopic(name);
+      // https://googleapis.dev/nodejs/pubsub/1.7.1/PubSub.html#createTopic
+      // [0]: The new topic.
+      // [1]: The full API response.
+      return createdTopic[0];
+    }
+    return topic;
   }
 
   async createOrGetSubscription(topicOrName, name, options = {}) {

@@ -25,8 +25,7 @@ class Job {
     this.data = data;
     this.config = config;
 
-    const { credentials, projectId, topicSuffix, batching = {} } = config;
-
+    const { credentials, projectId, topicSuffix } = config;
     if (!credentials) {
       throw new Error('`credentials` is required for setting up the Google Cloud Pub/Sub');
     }
@@ -38,11 +37,6 @@ class Job {
     this.topicName = `${this.name}-${topicSuffix}`;
     this.pubsub = cachedPubsubClient[projectId];
 
-    if (!cachedTopic[`${projectId}-${this.topicName}`]) {
-      cachedTopic[`${projectId}-${this.topicName}`] = this.pubsub.topic(this.topicName, { batching });
-    }
-
-    this.topic = cachedTopic[`${projectId}-${this.topicName}`];
     this.logger = new Logger({ debug: config.debug });
   }
 
@@ -55,7 +49,14 @@ class Job {
       }),
     );
 
-    return this.topic.publish(dataBuffer);
+    if (!cachedTopic[`${this.topicName}`]) {
+      cachedTopic[`${this.topicName}`] = await this.pubsub.createOrGetTopic(this.topicName);
+    }
+
+    this.topic = cachedTopic[`${this.topicName}`];
+    return this.topic.publishMessage({
+      data: dataBuffer,
+    });
   }
 }
 

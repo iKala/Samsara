@@ -3,7 +3,7 @@
 /**
  * Module dependencies
  */
-const _  = require('lodash');
+const _ = require('lodash');
 const { EventEmitter } = require('events');
 const { v1 } = require('@google-cloud/pubsub');
 const grpc = require('grpc');
@@ -12,24 +12,33 @@ const grpc = require('grpc');
  * Utilities
  */
 const Logger = require('../utils/logger');
+const PubSub = require('../utils/pubsub');
 
 const defaultMaxRetries = 200;
+
+const cachedPubsubClient = {};
 
 class Worker extends EventEmitter {
   constructor(config = {}) {
     super();
 
-    const { credentials, projectId } = config;
+    const { credentials, projectId, topicSuffix } = config;
 
     if (!credentials) {
       throw new Error('`credentials` is required for setting up the Google Cloud Pub/Sub');
     }
 
+    if (!cachedPubsubClient[projectId]) {
+      cachedPubsubClient[projectId] = new PubSub({ credentials, projectId, grpc });
+    }
+
+    this.topicName = `${this.name}-${topicSuffix}`;
+    this.pubsub = cachedPubsubClient[projectId];
+
     const configWithDefaultValue = _.defaults(config, { maxRetries: defaultMaxRetries });
 
     this.config = configWithDefaultValue;
     this.logger = new Logger({ debug: configWithDefaultValue.debug });
-
     this.subscriber = new v1.SubscriberClient({ credentials, projectId, grpc });
   }
 
@@ -39,12 +48,17 @@ class Worker extends EventEmitter {
     bulkSize = 50,
   ) {
     const { topicSuffix } = this.config;
-    // Create a job queue name(topic) with topic suffix for preventing naming conflic.
-    const topicName = `${jobName}-${topicSuffix}`;
+
+    if (!this.Subscription) {
+      this.Subscription = await this.pubsub.createSubscriptionIfNotExists(
+        `${jobName}-${topicSuffix}`,
+        `${jobName}-${this.config.subscriptionName}`,
+      );
+    }
 
     const formattedSubscription = this.subscriber.subscriptionPath(
       this.config.projectId,
-      `${topicName}-${this.config.subscriptionName}`,
+      `${jobName}-${this.config.subscriptionName}`,
     );
 
 
@@ -69,14 +83,14 @@ class Worker extends EventEmitter {
       const ackIds = response.receivedMessages.map(({ ackId }) => ackId);
       const jobIds = data.map(({ jobId }) => jobId);
 
-      this.logger.log(`The job of ${topicName} is finished and submit the ack request`, jobIds);
+      this.logger.log(`The job of ${jobName} is finished and submit the ack request`, jobIds);
 
       const doneCallback = async () => {
         if (isDoneOrFailed) {
           return;
         }
 
-        this.logger.log(`[bulk] The job of ${topicName} is finished and submit the ack request`, jobIds);
+        this.logger.log(`[bulk] The job of ${jobName} is finished and submit the ack request`, jobIds);
 
         let latestError;
         let retry = -1;
@@ -115,7 +129,7 @@ class Worker extends EventEmitter {
 
         isDoneOrFailed = true;
 
-        this.logger.log(`[bulk] The job of ${topicName} failed and submit the nack request, retry the message again`, jobIds);
+        this.logger.log(`[bulk] The job of ${jobName} failed and submit the nack request, retry the message again`, jobIds);
 
         // Same to the comment of `doneCallback`.
         // There is no way to know when will the nack job done.
@@ -167,15 +181,20 @@ class Worker extends EventEmitter {
     options,
   ) {
     const { topicSuffix } = this.config;
-    // Create a job queue name(topic) with topic suffix for preventing naming conflic.
-    const topicName = `${jobName}-${topicSuffix}`;
 
     let inProgress = 0;
     const maxInProgress = Number(options.flowControl.maxMessages);
-
+    // createSubscriptionIfNotExists
+    if (!this.Subscription) {
+      this.Subscription = await this.pubsub.createSubscriptionIfNotExists(
+        `${jobName}-${topicSuffix}`,
+        `${jobName}-${this.config.subscriptionName}`,
+        options,
+      );
+    }
     const formattedSubscription = this.subscriber.subscriptionPath(
       this.config.projectId,
-      `${topicName}-${this.config.subscriptionName}`,
+      `${jobName}-${this.config.subscriptionName}`,
     );
 
     // The maximum number of messages returned for this request.
@@ -195,7 +214,7 @@ class Worker extends EventEmitter {
 
           if (response.receivedMessages.length === 0) {
             inProgress -= 1;
-            return; 
+            return;
           }
 
           // Process the messages.
@@ -211,7 +230,7 @@ class Worker extends EventEmitter {
 
               isDoneOrFailed = true;
 
-              this.logger.log(`The job of ${topicName} is finished and submit the ack request`, { message });
+              this.logger.log(`The job of ${jobName} is finished and submit the ack request`, { message });
 
               let latestError;
               let retry = -1;
@@ -250,7 +269,7 @@ class Worker extends EventEmitter {
 
               isDoneOrFailed = true;
 
-              this.logger.log(`The job of ${topicName} failed and submit the nack request, retry the message again`, { message });
+              this.logger.log(`The job of ${jobName} failed and submit the nack request, retry the message again`, { message });
 
               // Same to the comment of `doneCallback`.
               // There is no way to know when will the nack job done.
