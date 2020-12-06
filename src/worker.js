@@ -237,101 +237,103 @@ class Worker extends EventEmitter {
           }
 
           // Process the messages.
-          response.receivedMessages.forEach(({ ackId, message }) => {
-            const data = JSON.parse(message.data.toString());
+          await Promise.all(
+            response.receivedMessages.map(async ({ ackId, message }) => {
+              const data = JSON.parse(message.data.toString());
 
-            let isDoneOrFailed = false;
+              let isDoneOrFailed = false;
 
-            const doneCallback = async () => {
-              if (isDoneOrFailed) {
-                return;
-              }
-
-              isDoneOrFailed = true;
-
-              this.logger.log(`The job of ${jobName} is finished and submit the ack request`, { message });
-
-              let latestError;
-              let retry = -1;
-              const maxRetries = this.config.maxRetries || defaultMaxRetries;
-
-              do {
-                try {
-                  const ackRequest = {
-                    subscription: formattedSubscription,
-                    ackIds: [ackId],
-                  };
-
-                  await this.subscriber.acknowledge(ackRequest);
-                  inProgress = inProgress > 0 ? inProgress - 1 : 0;
-
+              const doneCallback = async () => {
+                if (isDoneOrFailed) {
                   return;
-                } catch (error) {
-                  latestError = error;
-                  retry += 1;
-                  this.logger.log(`🔄 Retry to ack message ${retry}/${maxRetries}`);
                 }
 
-                if (retry > maxRetries) {
-                  retry = -1;
-                  this.logger.log('❌ Retry too much time.');
-                }
-              } while (retry !== -1);
+                isDoneOrFailed = true;
 
-              throw latestError;
-            };
+                this.logger.log(`The job of ${jobName} is finished and submit the ack request`, { message });
 
-            const failedCallback = async () => {
-              if (isDoneOrFailed) {
-                return;
-              }
+                let latestError;
+                let retry = -1;
+                const maxRetries = this.config.maxRetries || defaultMaxRetries;
 
-              isDoneOrFailed = true;
+                do {
+                  try {
+                    const ackRequest = {
+                      subscription: formattedSubscription,
+                      ackIds: [ackId],
+                    };
 
-              this.logger.log(`The job of ${jobName} failed and submit the nack request, retry the message again`, { message });
+                    await this.subscriber.acknowledge(ackRequest);
+                    inProgress = inProgress > 0 ? inProgress - 1 : 0;
 
-              // Same to the comment of `doneCallback`.
-              // There is no way to know when will the nack job done.
-              let latestError;
-              let retry = -1;
-              const maxRetries = this.config.maxRetries || defaultMaxRetries;
+                    return;
+                  } catch (error) {
+                    latestError = error;
+                    retry += 1;
+                    this.logger.log(`🔄 Retry to ack message ${retry}/${maxRetries}`);
+                  }
 
-              do {
-                try {
-                  const modifyAckRequest = {
-                    subscription: formattedSubscription,
-                    ackIds: [ackId],
-                    // If this parameter is 0, a default value of 10 seconds is used.
-                    ackDeadlineSeconds: 0,
-                  };
+                  if (retry > maxRetries) {
+                    retry = -1;
+                    this.logger.log('❌ Retry too much time.');
+                  }
+                } while (retry !== -1);
 
-                  // If the message is not yet processed, reset its ack deadline.
-                  await this.subscriber.modifyAckDeadline(modifyAckRequest);
+                throw latestError;
+              };
 
-                  inProgress = inProgress > 0 ? inProgress - 1 : 0;
-
+              const failedCallback = async () => {
+                if (isDoneOrFailed) {
                   return;
-                } catch (error) {
-                  latestError = error;
-                  retry += 1;
-                  this.logger.log(`🔄 Retry to nack message ${retry}/${maxRetries}`);
                 }
 
-                if (retry > maxRetries) {
-                  retry = -1;
-                  this.logger.log('❌ Retry too much time.');
-                }
-              } while (retry !== -1);
+                isDoneOrFailed = true;
 
-              throw latestError;
-            };
+                this.logger.log(`The job of ${jobName} failed and submit the nack request, retry the message again`, { message });
 
-            callback(
-              { ...message.attributes, ...data, jobId: message.messageId },
-              doneCallback,
-              failedCallback,
-            );
-          });
+                // Same to the comment of `doneCallback`.
+                // There is no way to know when will the nack job done.
+                let latestError;
+                let retry = -1;
+                const maxRetries = this.config.maxRetries || defaultMaxRetries;
+
+                do {
+                  try {
+                    const modifyAckRequest = {
+                      subscription: formattedSubscription,
+                      ackIds: [ackId],
+                      // If this parameter is 0, a default value of 10 seconds is used.
+                      ackDeadlineSeconds: 0,
+                    };
+
+                    // If the message is not yet processed, reset its ack deadline.
+                    await this.subscriber.modifyAckDeadline(modifyAckRequest);
+
+                    inProgress = inProgress > 0 ? inProgress - 1 : 0;
+
+                    return;
+                  } catch (error) {
+                    latestError = error;
+                    retry += 1;
+                    this.logger.log(`🔄 Retry to nack message ${retry}/${maxRetries}`);
+                  }
+
+                  if (retry > maxRetries) {
+                    retry = -1;
+                    this.logger.log('❌ Retry too much time.');
+                  }
+                } while (retry !== -1);
+
+                throw latestError;
+              };
+
+              await callback(
+                { ...message.attributes, ...data, jobId: message.messageId },
+                doneCallback,
+                failedCallback,
+              );
+            }),
+          );
         } catch (error) {
           // Failed to pull message.
           inProgress -= 1;
