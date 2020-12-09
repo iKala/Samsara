@@ -94,7 +94,7 @@ class Worker extends EventEmitter {
           this.logger.log(`The job of ${jobName} is finished and submit the ack request`, jobIds);
 
           const doneCallback = async () => {
-            if (isDoneOrFailed) {
+            if (isDoneOrFailed || ackIds.length === 0) {
               return;
             }
 
@@ -131,7 +131,7 @@ class Worker extends EventEmitter {
           };
 
           const failedCallback = async () => {
-            if (isDoneOrFailed) {
+            if (isDoneOrFailed || ackIds.length === 0) {
               return;
             }
 
