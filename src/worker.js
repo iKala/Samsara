@@ -95,6 +95,7 @@ class Worker extends EventEmitter {
 
           const doneCallback = async () => {
             if (isDoneOrFailed || ackIds.length === 0) {
+              inProgress = inProgress > 0 ? inProgress - 1 : 0;
               return;
             }
 
